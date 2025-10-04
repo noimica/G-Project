@@ -1,3 +1,5 @@
+package view;
+
 import java.awt.BorderLayout;
 import java.awt.Color;
 import java.awt.Container;
@@ -9,6 +11,8 @@ import java.awt.event.KeyEvent;
 import java.awt.event.KeyListener;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
+import java.util.List;
+import java.util.function.Consumer;
 
 import javax.swing.JFrame;
 import javax.swing.JLabel;
@@ -16,14 +20,19 @@ import javax.swing.JPanel;
 import javax.swing.SwingConstants;
 import javax.swing.border.TitledBorder;
 
+import dto.CommandDTO;
+import dto.UnitDTO;
+
 // JFrame を継承し、KeyListenerを実装
 public class BattleScreenLayout extends JFrame implements KeyListener {
 
 	private final CommandPanel commandPanel;
 	private final LogPanel logPanel;
+	private final MainDrawingPanel drawingPanel; // drawingPanelをフィールドに
 
-	// constructor. フレームの設定関係を行う
-	BattleScreenLayout(String title) {
+	// constructor. DTOを受け取るように変更
+	public BattleScreenLayout(String title, UnitDTO player, UnitDTO enemy, Consumer<CommandDTO> commandConsumer,
+			List<CommandDTO> commands) {
 		setTitle(title);
 		setSize(800, 550);
 		setLocationRelativeTo(null);
@@ -33,7 +42,7 @@ public class BattleScreenLayout extends JFrame implements KeyListener {
 		cp.setLayout(new BorderLayout(10, 10));
 
 		// 1. メイン描画エリア (画面上部)
-		MainDrawingPanel drawingPanel = new MainDrawingPanel();
+		drawingPanel = new MainDrawingPanel(player, enemy); // DTOを渡す
 		cp.add(drawingPanel, BorderLayout.CENTER);
 
 		// 2. コマンドとログエリアを格納するコンテナ (画面下部)
@@ -42,9 +51,9 @@ public class BattleScreenLayout extends JFrame implements KeyListener {
 		bottomPanel.setPreferredSize(new Dimension(800, 180));
 
 		// 2.1. コマンド選択エリア (画面下部左)
-		// LogPanelを渡して、コマンド選択時にログを更新できるようにする
 		logPanel = new LogPanel();
-		commandPanel = new CommandPanel(logPanel);
+		// ConsumerとDTOリストを渡す
+		commandPanel = new CommandPanel(logPanel, commandConsumer, commands);
 		bottomPanel.add(commandPanel);
 
 		// 2.2. ログ表示エリア (画面下部右)
@@ -53,10 +62,23 @@ public class BattleScreenLayout extends JFrame implements KeyListener {
 		cp.add(bottomPanel, BorderLayout.SOUTH);
 
 		// フレームにKeyListenerをセット
-		// KeyListenerをJFrameに登録する場合は、setFocusable(true)とrequestFocusInWindow()が必要です
 		addKeyListener(this);
 		setFocusable(true);
 		requestFocusInWindow();
+	}
+
+	/**
+	 * ユニット情報を更新して再描画 (DTO版)
+	 */
+	public void updateUnits(UnitDTO player, UnitDTO enemy) {
+		drawingPanel.updateUnits(player, enemy);
+	}
+
+	/**
+	 * ログパネルを取得
+	 */
+	public LogPanel getLogPanel() {
+		return logPanel;
 	}
 
 	// KeyListenerの実装
@@ -79,102 +101,43 @@ public class BattleScreenLayout extends JFrame implements KeyListener {
 	@Override
 	public void keyTyped(KeyEvent e) {
 	}
-
-	public static void main(String args[]) {
-		javax.swing.SwingUtilities.invokeLater(() -> {
-			new BattleScreenLayout("1D コマンドバトル（インタラクティブ）").setVisible(true);
-		});
-	}
 }
 
 // -------------------------------------------------------------
 /**
- * ログ表示パネルクラス
- */
-class LogPanel extends JPanel {
-	private final JLabel logArea;
-	private final StringBuilder logHistory = new StringBuilder();
-	private int turn = 1;
-
-	public LogPanel() {
-		setLayout(new BorderLayout());
-		setBorder(new TitledBorder("■ バトルログ"));
-
-		logArea = new JLabel();
-		logArea.setVerticalAlignment(SwingConstants.TOP);
-		logArea.setFont(new Font("Monospaced", Font.PLAIN, 12));
-
-		// 初期ログ
-		appendLog("ターン " + turn + ": 戦闘開始！コマンドを選択してください。");
-
-		add(logArea, BorderLayout.CENTER);
-	}
-
-	/**
-	 * ログに新しいメッセージを追加し、表示を更新する
-	 * 
-	 * @param message
-	 *            追加するメッセージ
-	 */
-	public void appendLog(String message) {
-		turn++;
-		// HTMLを使用して改行と色付け（ここでは単純なHTML）
-		logHistory.insert(0, String.format("<font color='black'>[T%d] %s</font><br>", turn, message));
-
-		// ログが長くなりすぎたら古いものを削除（任意）
-		int maxLines = 10;
-		String fullLog = logHistory.toString();
-		if (fullLog.split("<br>").length > maxLines) {
-			int lastBrIndex = fullLog.lastIndexOf("<br>", fullLog.lastIndexOf("<br>") - 1);
-			if (lastBrIndex != -1) {
-				logHistory.delete(lastBrIndex, logHistory.length());
-			}
-		}
-
-		// JLabelはHTMLでラップする必要がある
-		logArea.setText("<html><body>" + logHistory.toString() + "</body></html>");
-	}
-}
-
-// -------------------------------------------------------------
-/**
- * コマンド選択パネルクラス
+ * コマンド選択パネルクラス (DTO版)
  */
 class CommandPanel extends JPanel {
 
 	private final LogPanel logPanel;
+	private final Consumer<CommandDTO> commandConsumer;
+	private final List<CommandDTO> commands;
 
-	// 実際のコマンド名
-	private static final String[] COMMAND_NAMES = {
-			"攻撃", "防御", "チャージ",
-			"必殺技", "アイテム", "逃走",
-			"待機", "???", "設定"
-	};
-
-	public CommandPanel(LogPanel logPanel) {
+	public CommandPanel(LogPanel logPanel, Consumer<CommandDTO> commandConsumer, List<CommandDTO> commands) {
 		this.logPanel = logPanel;
+		this.commandConsumer = commandConsumer;
+		this.commands = commands;
+
 		setBorder(new TitledBorder("■ コマンド選択 (1～9)"));
 		setLayout(new GridLayout(3, 3, 5, 5));
 
-		for (int i = 0; i < 9; i++) {
-			final int commandIndex = i + 1; // コマンド番号は 1 から 9
+		for (int i = 0; i < commands.size() && i < 9; i++) {
+			final int commandIndex = i; // 0-indexed
+			CommandDTO command = commands.get(i);
 
-			JLabel commandLabel = new JLabel(commandIndex + ". " + COMMAND_NAMES[i], SwingConstants.CENTER);
+			JLabel commandLabel = new JLabel((i + 1) + ". " + command.getDisplayName(), SwingConstants.CENTER);
 			commandLabel.setFont(new Font("Monospaced", Font.BOLD, 14));
 
-			// クリック可能なUIとして見せるためのスタイル
 			commandLabel.setBackground(Color.LIGHT_GRAY);
 			commandLabel.setForeground(Color.BLACK);
 			commandLabel.setOpaque(true);
 
-			// マウスリスナーを追加して、クリックでコマンド実行
 			commandLabel.addMouseListener(new MouseAdapter() {
 				@Override
 				public void mouseClicked(MouseEvent e) {
-					executeCommand(commandIndex);
+					executeCommand(commandIndex + 1);
 				}
 
-				// クリック可能なことを示すため、ホバー時に色を変える
 				@Override
 				public void mouseEntered(MouseEvent e) {
 					commandLabel.setBackground(Color.CYAN);
@@ -190,34 +153,42 @@ class CommandPanel extends JPanel {
 		}
 	}
 
-	/**
-	 * コマンド番号に基づき、コマンドを実行する（ここではログ出力のみ）
-	 * 
-	 * @param commandNumber
-	 *            選択されたコマンドの番号 (1-9)
-	 */
 	public void executeCommand(int commandNumber) {
-		if (commandNumber >= 1 && commandNumber <= 9) {
-			String commandName = COMMAND_NAMES[commandNumber - 1];
+		if (commandNumber >= 1 && commandNumber <= commands.size()) {
+			CommandDTO command = commands.get(commandNumber - 1);
 
-			// メインロジックをここに記述する代わりに、ログに出力
-			logPanel.appendLog("ガンダムがコマンド " + commandNumber + " [" + commandName + "] を選択しました。");
+			// Consumerを通じてアクションを発行
+			commandConsumer.accept(command);
+
+			// UIの即時フィードバックとしてログ出力
+			logPanel.appendLog("コマンド " + command.getDisplayName() + " を選択しました。");
 		}
 	}
 }
 
 // -------------------------------------------------------------
 /**
- * 画面上部の自機と敵機の描画を行うパネル (描画特化)
+ * 画面上部の自機と敵機の描画を行うパネル (DTO版)
  */
 class MainDrawingPanel extends JPanel {
 	private static final int GROUND_Y = 250;
 	private static final int UNIT_SIZE = 60;
 	private final int gundamX = 100;
 
-	MainDrawingPanel() {
+	private UnitDTO player;
+	private UnitDTO enemy;
+
+	MainDrawingPanel(UnitDTO player, UnitDTO enemy) {
+		this.player = player;
+		this.enemy = enemy;
 		setBackground(Color.DARK_GRAY);
 		setDoubleBuffered(true);
+	}
+
+	public void updateUnits(UnitDTO player, UnitDTO enemy) {
+		this.player = player;
+		this.enemy = enemy;
+		repaint(); // ユニット情報が更新されたら再描画
 	}
 
 	@Override
@@ -227,33 +198,45 @@ class MainDrawingPanel extends JPanel {
 		int panelWidth = getWidth();
 		int zakuX = panelWidth - 100 - UNIT_SIZE; // 敵機X座標
 
-		// 1. 地面 (一次元のバトルフィールド) の描画
 		g.setColor(new Color(100, 100, 100));
 		g.fillRect(0, GROUND_Y, panelWidth, getHeight() - GROUND_Y);
 
-		// 2. ステータス表示エリア
 		g.setColor(Color.WHITE);
 		g.setFont(new Font("Monospaced", Font.BOLD, 18));
 		g.drawString("== BATTLE FIELD (1D) ==", panelWidth / 2 - 150, 20);
 
-		// 3. ユニットの描画
-
-		// ガンダム (自機: 青)
+		// プレイヤー (自機: 青)
 		g.setColor(new Color(0, 100, 255));
 		g.fillRect(gundamX, GROUND_Y - UNIT_SIZE, UNIT_SIZE, UNIT_SIZE);
 		g.setColor(Color.WHITE);
 		g.setFont(new Font("Serif", Font.BOLD, 24));
-		g.drawString("G", gundamX + 20, GROUND_Y - 25);
-		g.setFont(new Font("SansSerif", Font.PLAIN, 12));
-		g.drawString("HP: XXX", gundamX, GROUND_Y + 15);
 
-		// ザク (敵機: 緑)
+		String playerName = (player != null) ? player.getName() : "";
+		if (!playerName.isEmpty()) {
+			g.drawString(playerName.substring(0, 1), gundamX + 20, GROUND_Y - 25);
+		} else {
+			g.drawString("P", gundamX + 20, GROUND_Y - 25);
+		}
+		g.setFont(new Font("SansSerif", Font.PLAIN, 12));
+		g.drawString("HP: " + (player != null ? player.getHp() : "XXX"), gundamX, GROUND_Y + 15);
+		g.drawString("EP: " + (player != null ? player.getEp() : "XXX"), gundamX, GROUND_Y + 30);
+		g.drawString("SP: " + (player != null ? player.getSp() : "XXX"), gundamX, GROUND_Y + 45);
+
+		// 敵 (敵機: 緑)
 		g.setColor(new Color(50, 150, 50));
 		g.fillRect(zakuX, GROUND_Y - UNIT_SIZE, UNIT_SIZE, UNIT_SIZE);
 		g.setColor(Color.BLACK);
 		g.setFont(new Font("Serif", Font.BOLD, 24));
-		g.drawString("Z", zakuX + 20, GROUND_Y - 25);
+
+		String enemyName = (enemy != null) ? enemy.getName() : "";
+		if (!enemyName.isEmpty()) {
+			g.drawString(enemyName.substring(0, 1), zakuX + 20, GROUND_Y - 25);
+		} else {
+			g.drawString("E", zakuX + 20, GROUND_Y - 25);
+		}
 		g.setFont(new Font("SansSerif", Font.PLAIN, 12));
-		g.drawString("HP: YYY", zakuX, GROUND_Y + 15);
+		g.drawString("HP: " + (enemy != null ? enemy.getHp() : "YYY"), zakuX, GROUND_Y + 15);
+		g.drawString("EP: " + (enemy != null ? enemy.getEp() : "YYY"), zakuX, GROUND_Y + 30);
+		g.drawString("SP: " + (enemy != null ? enemy.getSp() : "YYY"), zakuX, GROUND_Y + 45);
 	}
 }

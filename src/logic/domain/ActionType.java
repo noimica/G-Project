@@ -1,10 +1,21 @@
 package logic.domain;
 
-//ドメイン層: Entity
 public enum ActionType {
-	DO_NOTHING, MOVE, VULCAN, // バルカン (遠隔)
-	BEAM_SABER, // ビームサーベル (近接)
-	DEFEND_EVADE, // 防御・回避
-	WEAPON_DEPLOYMENT, // 武装展開 (具体的な効果は省略)
-	ULTIMATE_SKILL // 必殺技 (EP全消費)
+    DO_NOTHING("何もしない"),
+    MOVE("移動"),
+    VULCAN("バルカン"),
+    BEAM_SABER("ビームサーベル"),
+    DEFEND_EVADE("防御・回避"),
+    WEAPON_DEPLOYMENT("武装展開"),
+    ULTIMATE_SKILL("必殺技");
+
+    private final String displayName;
+
+    ActionType(String displayName) {
+        this.displayName = displayName;
+    }
+
+    public String getDisplayName() {
+        return displayName;
+    }
 }
