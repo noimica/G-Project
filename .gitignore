@@ -4,27 +4,9 @@
 *.war
 *.ear
 
-# Eclipse
-.project
-.classpath
-.settings
-
-# Idea
-.idea
-*.iml
-*.iws
-*.ipr
-
 # OS
 Thumbs.db
 .DS_Store
-
-# Gradle
-.gradle
-!gradle-wrapper.jar
-
-# Maven
-target
 
 # Build
 out
