@@ -1,81 +1,35 @@
 package logic.controller;
 
-import java.util.ArrayList;
-import java.util.List;
-
-import logic.adapter.BattleActionAdapter;
+import logic.domain.ActionType;
 import logic.domain.BattleResult;
 import logic.domain.Unit;
-import logic.domain.UnitState;
-import logic.gundom.BattleLogic;
 import logic.service.BattleService;
 
 /**
- * Controller layer for the game.
- * Manages the state of the battle and executes turns.
+ * A stateless controller that executes actions.
+ * It acts as a facade over the BattleService.
  */
 public class GameEngine {
-	private final BattleService battleService;
-	private final BattleLogic playerALogic;
-	private final BattleLogic playerBLogic;
-	private final Unit unitA;
-	private final Unit unitB;
-	private final List<BattleResult> turnResults = new ArrayList<>();
+    private final BattleService battleService;
 
-	public GameEngine(BattleService battleService, BattleLogic playerALogic, BattleLogic playerBLogic, Unit unitA, Unit unitB) {
-		this.battleService = battleService;
-		this.playerALogic = playerALogic;
-		this.playerBLogic = playerBLogic;
-		this.unitA = unitA;
-		this.unitB = unitB;
-	}
+    public GameEngine(BattleService battleService) {
+        this.battleService = battleService;
+    }
 
-	/**
-	 * Runs one full turn of the battle, with actions for both Unit A and Unit B.
-	 */
-	public void runBattleTurn() {
-		turnResults.clear();
-
-		// --- Pre-turn phase ---
-		battleService.executeStartTurn(unitA);
-		battleService.executeStartTurn(unitB);
-
-		// --- Player A's Turn ---
-		if (unitA.getCurrentHp() > 0) {
-			UnitState stateA = new UnitState(unitA);
-			UnitState stateB = new UnitState(unitB);
-			BattleActionAdapter adapterA = new BattleActionAdapter(battleService, unitA, unitB);
-			playerALogic.decideAction(stateA, stateB, adapterA);
-			if (adapterA.getLastResult() != null) {
-				turnResults.add(adapterA.getLastResult());
-			}
-		}
-
-		// --- Player B's Turn ---
-		if (unitB.getCurrentHp() > 0) {
-			UnitState stateA = new UnitState(unitA);
-			UnitState stateB = new UnitState(unitB);
-			BattleActionAdapter adapterB = new BattleActionAdapter(battleService, unitB, unitA);
-			playerBLogic.decideAction(stateB, stateA, adapterB);
-			if (adapterB.getLastResult() != null) {
-				turnResults.add(adapterB.getLastResult());
-			}
-		}
-	}
-
-	public Unit getUnitA() {
-		return unitA;
-	}
-
-	public Unit getUnitB() {
-		return unitB;
-	}
-
-	public List<BattleResult> getTurnResults() {
-		return turnResults;
-	}
-
-	public boolean isGameOver() {
-		return unitA.getCurrentHp() <= 0 || unitB.getCurrentHp() <= 0;
-	}
+    /**
+     * Executes a single action for an actor against an opponent.
+     * This includes the pre-turn preparations for the actor.
+     * @param actor The unit taking the action.
+     * @param opponent The opposing unit.
+     * @param action The action to perform.
+     * @param value An optional value for the action (e.g., distance).
+     * @return The result of the action.
+     */
+    public BattleResult executeAction(Unit actor, Unit opponent, ActionType action, int value) {
+        // Pre-turn phase for the current actor.
+        battleService.executeStartTurn(actor);
+        
+        // Execute the action and return the result.
+        return battleService.executeAction(actor, opponent, action, value);
+    }
 }

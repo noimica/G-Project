@@ -160,8 +160,7 @@ class CommandPanel extends JPanel {
 			// Consumerを通じてアクションを発行
 			commandConsumer.accept(command);
 
-			// UIの即時フィードバックとしてログ出力
-			logPanel.appendLog("コマンド " + command.getDisplayName() + " を選択しました。");
+			
 		}
 	}
 }
